@@ -4,7 +4,7 @@ import 'package:meta/meta.dart';
 class Coin extends Equatable {
   final String name;
   final String fullName;
-  final int price;
+  final double price;
 
   const Coin({
     @required this.name,
@@ -26,7 +26,7 @@ class Coin extends Equatable {
     return Coin(
       name: json['CoinInfo']['Name'] as String,
       fullName: json['CoinInfo']['FullName'] as String,
-      price: json['RAW']['KRW']['PRICE'] as int,
+      price: (json['RAW']['KRW']['PRICE'] as num).toDouble(),
     );
   }
 }
