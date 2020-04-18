@@ -1,7 +1,7 @@
-import 'package:crypto_bloc_flutter/models/coin_model.dart';
-import 'package:crypto_bloc_flutter/repositories/crypto_repository.dart';
+import 'package:crypto_bloc_flutter/blocs/crypto/crypto_bloc.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_money_formatter/flutter_money_formatter.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -10,8 +10,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _cryptoRepository = CryptoRepository();
-  int _page = 0;
+  final _scrollController = ScrollController();
 
   @override
   Widget build(BuildContext context) {
@@ -19,37 +18,47 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text('Top Coins'),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).primaryColor,
-              Colors.grey[900],
-            ],
-          ),
+      body: BlocBuilder<CryptoBloc, CryptoState>(
+        builder: (context, state) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Theme.of(context).primaryColor,
+                  Colors.grey[900],
+                ],
+              ),
+            ),
+            child: _buildBody(state),
+          );
+        },
+      ),
+    );
+  }
+
+  _buildBody(CryptoState state) {
+    if (state is CryptoLoading) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation(Theme.of(context).accentColor),
         ),
-        child: FutureBuilder(
-          future: _cryptoRepository.getTopCoins(page: _page),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return Center(
-                child: CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation(Theme.of(context).accentColor),
-                ),
-              );
-            }
-            final List<Coin> coins = snapshot.data;
-            return RefreshIndicator(
-              color: Theme.of(context).accentColor,
-              onRefresh: () async {
-                setState(() => _page = 0);
-              },
-              child: ListView.builder(
-                  itemBuilder: (BuildContext context, int index) {
-                final coin = coins[index];
+      );
+    } else if (state is CryptoLoaded) {
+      return RefreshIndicator(
+        color: Theme.of(context).accentColor,
+        onRefresh: () async {
+          context.bloc<CryptoBloc>().add(RefreshCoins());
+        },
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) =>
+              _onScrollNotification(notification, state),
+          child: ListView.builder(
+              controller: _scrollController,
+              itemCount: state.coins.length,
+              itemBuilder: (BuildContext context, int index) {
+                final coin = state.coins[index];
                 FlutterMoneyFormatter fmf =
                     FlutterMoneyFormatter(amount: coin.price);
 
@@ -83,10 +92,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }),
-            );
-          },
         ),
-      ),
-    );
+      );
+    } else if (state is CryptoError) {
+      return Center(
+        child: Text(
+          '정보를 불러오지 못했습니다.\n인터넷 연결을 확인해주세요.',
+          style: TextStyle(
+            color: Theme.of(context).accentColor,
+            fontSize: 18.0,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+  }
+
+  bool _onScrollNotification(ScrollNotification notif, CryptoLoaded state) {
+    if (notif is ScrollEndNotification && _scrollController.position.extentAfter == 0) {
+      context.bloc<CryptoBloc>().add(LoadMoreCoins(coins: state.coins));
+    }
+    return false;
   }
 }
+
