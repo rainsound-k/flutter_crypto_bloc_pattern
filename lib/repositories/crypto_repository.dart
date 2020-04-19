@@ -24,9 +24,11 @@ class CryptoRepository extends BaseCryptoRepository {
       if (response.statusCode == 200) {
         Map<String, dynamic> data = json.decode(response.body);
         List<dynamic> coinList = data['Data'];
-        coinList.forEach(
-          (json) => coins.add(Coin.fromJson(json)),
-        );
+        coinList.forEach((json) {
+          if (json.containsKey('RAW')) {
+            coins.add(Coin.fromJson(json));
+          }
+        });
       }
       return coins;
     } catch (err) {
